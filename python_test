@@ -1,0 +1,70 @@
+#Test the function
+#assumptions
+Coupon_rate = 0.075
+face_value = 100
+rf_rate = 0.03
+
+
+#coding
+
+class bondPrice(object):
+    
+    
+    def eIRRCal(coupon, nper,recovery_rate,marginal_df_rate): #function to calculate the expected IRR 
+
+
+        #monthly_payment (non-default CFs)
+        non_df_CF = -1* np.pmt(coupon/12,nper,face_value)       
+
+        #default CFs
+        df_CF_arr = np.zeros(nper)
+        OS = 100*np.ones(nper) #nper months
+        for i in range(nper):
+            if i == 0:
+                OS[i] = face_value * (1 + Coupon_rate/12) - non_df_CF
+            else:
+                OS[i] = OS[i-1] * (1 + Coupon_rate/12) - non_df_CF
+
+            df_CF_arr[i] = OS[i] * recovery_rate
+            #print(i ,OS[i], non_df_CF)
+
+        #marginal Probability
+        m_arr = np.zeros(nper)
+        surv_arr = np.zeros(nper)
+        period_DF_arr = np.zeros(nper)
+
+        #expected CF
+        exp_CF_arr = np.ones(nper)
+
+        pd_prev = 1
+        for i in range(nper):
+            #marignal PD
+            m_arr[i] = abs(marginal_df_rate + np.random.normal(loc=0, scale=0.05))
+
+            #survival prob
+            if i == 0:
+                surv_arr[i] = (1 * (1-m_arr[i]) ** (1/12))
+            else:
+                surv_arr[i] = (surv_arr[i-1]) * ((1 - m_arr[i]) ** (1/12))
+
+            #periodic PD
+            if i == 0:
+                period_DF_arr[i] = pd_prev - surv_arr[i]
+            else:
+                period_DF_arr[i] = surv_arr[i-1] - surv_arr[i]
+
+            #Expected CF calculation
+            exp_CF_arr[i] = (non_df_CF * surv_arr[i]) + (df_CF_arr[i] * period_DF_arr[i])
+
+            #print(i, non_df_CF, m_arr[i], surv_arr[i], df_CF_arr[i], exp_CF_arr[i])
+
+        #calculate Expected IRR
+        eirr = 12*round(np.irr(np.append(-100.00,exp_CF_arr)),5)
+
+        #print ('The expected IRR is %2.2f%%' %(100*eirr))
+
+        return [coupon, eirr] #need to minimize this function
+
+    def adjustCoupon(self, coupon):
+        return scipy.optimize.fsolve(self.eIRRCal, 1, args=(coupon, recovery_rate, marginal_df_rate))
+
